@@ -43,7 +43,7 @@ At the heart of Jalapeno is the concept that many SDN use cases really involve t
 
 #### Some project principles and goals
 
-* Use-case, topology, and endpoint agnostic - The host, hypervisor, CNI, or other endpoint may be the control/encapsulation point (linux, fd.io, eBPF, etc.)
+* Use-case, topology, and endpoint agnostic - The host, hypervisor, CNI, or other endpoint may be the control/encapsulation point (linux, fd.io, Cilium, eBPF, etc.)
 * Give applications the ability to directly choose their network SDN service or SLA
 * Enable development of an ecosystem of SDN control applications, tools, and capabilities
 * Modular, extensible, microservice architecture
@@ -59,16 +59,17 @@ Jalapeno is comprised of a series of microservices which can be summarized as:
   
     * Base data processors: parse topology and performance data coming off Kafka and populate the base data collections in the Arango graphDB or Influx time-series DB.  The GoBMP-Arango and Telegraf pods are base processors.
   
-    * Virtual Topology or Edge processors: mine the graph and TSDB data collections and then populate virtual topology Edge collections in the graph DB.  Linkstate-edge is an one such processor: <https://github.com/cisco-open/jalapeno/tree/main/linkstate-edge>
+    * Virtual Topology or Graph processors: mine the graph and TSDB data collections and then populate virtual topology Edge collections in the graph DB.  igp_graph and ip_graph are examples of graph processors: <https://github.com/cisco-open/jalapeno/tree/main/igp_graph>
 
-* **Databases** - An Arango Graph Database is used for topology modeling and as a document or key-value store. The graphDB is paired with an Influx Time-Series Database for collection of streaming telemetry data via Telegraf/gNMI.
+* **Databases** - An Arango Graph Database is used for topology modeling and as a document or key-value store. The graphDB is paired with an Influx Time-Series Database for collection of streaming telemetry data via Telegraf/gNMI. Jalapeno's extensible structure allows for the addition of other datastores in the futre.
   
-* **API** - expose Jalapeno's virtual topology data for application consumption 
-    * An implementation focusing on fetching topology and telemetry data from Jalapeño can be found in a separate GitHub organisation: <https://github.com/jalapeno-api-gateway>
+* **API** - expose Jalapeno's virtual topology data for application consumption. The base Jalapeno install includes a [REST API](api/v1/README.md) for querying ArangoDB data collections and running graph traversals. There is a separate API-GW project under development here: <https://github.com/jalapeno-api-gateway>
 
-* **Control Plane Applications** - SDN control applications that mine the graph and time-series databases for the label stack or SRv6 SRH data needed to execute topology or traffic engineering use cases. 
+* **Control Plane Applications** - SDN control applications that mine the graph and time-series databases for the label stack or SRv6 SID data needed to execute topology or traffic engineering use cases:
+  
+  * [srctl](https://github.com/jalapeno/srctl) is an example Jalapeno control plane application. *`srctl`* is a linux command line utility modeled after kubectl, and which enables an endpoint to make an call to Jalapeno's API to request a network service or path based upon the endpoint's desired paramenters. *`srctl`* will receive the SRv6 SID instruction from the API call and can program local linux or VPP routes based on the SRv6 instruction.
 
-Jalapeno's kubernetes architecture make it inherently extensible, and we imagine the number of collectors, graphDB virtual topology use cases, and control plane applications to expand significantly as our community grows.
+Jalapeno's kubernetes architecture makes it inherently extensible, and we imagine the number of collectors, graphDB virtual topology use cases, and control plane applications to expand significantly as our community grows.
 
 #### ** Note on BGP-LS
 
