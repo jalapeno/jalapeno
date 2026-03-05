@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build gobmp-arango
+        run: CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o bin/gobmp-arango ./cmd/gobmp-arango/
+
+      - name: Build igp-graph
+        run: CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o bin/igp-graph ./cmd/igp-graph/
+
+      - name: Build ip-graph
+        run: CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o bin/ip-graph ./cmd/ip-graph/
+
+      - name: Build linkstate-edge
+        run: CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o bin/linkstate-edge ./cmd/linkstate-edge/
+
+  lint-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install API dependencies
+        working-directory: api/v1
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
+        working-directory: api/v1
+        run: python -m py_compile app/main.py

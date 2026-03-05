@@ -1,0 +1,102 @@
+name: Build and Push Images
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/jalapeno
+
+jobs:
+  build-go-services:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: gobmp-arango
+            cmd: cmd/gobmp-arango
+            dockerfile: build/Dockerfile.gobmp-arango
+          - name: igp-graph
+            cmd: cmd/igp-graph
+            dockerfile: build/Dockerfile.igp-graph
+          - name: ip-graph
+            cmd: cmd/ip-graph
+            dockerfile: build/Dockerfile.ip-graph
+          - name: linkstate-edge
+            cmd: cmd/linkstate-edge
+            dockerfile: build/Dockerfile.linkstate-edge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Compile binary
+        run: |
+          mkdir -p bin
+          CGO_ENABLED=0 GOOS=linux go build -a \
+            -ldflags '-extldflags "-static"' \
+            -o bin/${{ matrix.service.name }} ./${{ matrix.service.cmd }}/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:latest
+
+  build-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API
+        uses: docker/build-push-action@v6
+        with:
+          context: api/v1
+          file: build/Dockerfile.api
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/jalapeno-api:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}/jalapeno-api:latest
